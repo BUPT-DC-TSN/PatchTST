@@ -331,6 +331,7 @@ class Exp_Main(Exp_Basic):
         self.model.eval()
         max_len = len(pred_loader)
         with torch.no_grad():
+            start_time = time.time()  # 记录 forward 开始时间
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(pred_loader):
                 f_dim = -1 if self.args.features == 'MS' else 0
                 batch_x = batch_x.float().to(self.device)
@@ -366,7 +367,9 @@ class Exp_Main(Exp_Basic):
                 pred = pred_data.scaler.inverse_transform(pred)
                 pred = pred[-self.args.pred_len:, f_dim:]
                 preds.append(pred)
-        
+        end_time = time.time()  # 记录 forward 结束时间
+        total_forward_time = end_time - start_time  # 计算本次 forward 时间
+        print(total_forward_time)
         preds = np.array(preds)
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
         preds = preds.squeeze()

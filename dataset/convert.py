@@ -1,97 +1,161 @@
-import pandas as pd
-import argparse
 import re
-import os
+import pandas as pd
+import numpy as np
 
-def convert(data_dir):
-    # 读取文件 'times.txt'
-    with open(os.path.join(data_dir, "times.txt"), "r") as file:
+# 读取drift.txt文件并解析
+def parse_drift_file(file_path):
+    with open(file_path, 'r') as file:
         lines = file.readlines()
-    
-    # 存储 server#0 和 server#1 的时间戳
-    timestamps_0 = []
-    timestamps_1 = []
-    
-    # 解析文件中的每一行，提取时间戳
-    for line in lines:
-        server, timestamp = line.strip().split(": ")
-        if "server#0" in server:
-            timestamps_0.append(float(timestamp))
-        elif "server#1" in server:
-            timestamps_1.append(float(timestamp))
-    
-    # 计算相邻的时间戳差值
-    data = []
-    for t0, t1 in zip(timestamps_0, timestamps_1):
-        timestamp = t0  # 使用 server#0 的时间戳作为基准时间
-        time_diff = t1 - t0  # 计算差值
-        data.append([timestamp, time_diff])
-    
-    # 将数据保存为 CSV 文件
-    time_diff_df = pd.DataFrame(data, columns=["timestamp", "diff"])
-    time_diff_dict = {}
-    for _, row in time_diff_df.iterrows():
-        timestamp = str(row['timestamp']).split('.')[0]  # 只取整数部分
-        time_diff_dict[timestamp] = row['diff']
-    
-    # 打开 log 文件并读取所有行
-    log_file_path = os.path.join(data_dir, 'logs.txt')
-    with open(log_file_path, "r") as file:
-        log_lines = file.readlines()
-    
-    # 用来存储匹配的数据
-    matching_data = []
-    
-    # 正则表达式，用于提取日志中的信息
-    log_pattern = re.compile(r'(?P<timestamp>\d+\.\d+) ptp4l\[\d+\.\d+\]: master offset\s+(?P<master_offset>-?\d+)\s+s2 freq\s+(?P<freq>-?\+?\d+)\s+path delay\s+(?P<path_delay>\d+)')
-    
-    # 遍历日志文件中的每一行，提取数据
-    for line in log_lines:
-        match = log_pattern.search(line)
-        if match:
-            timestamp = match.group("timestamp")
-            timestamp_match = match.group("timestamp").split('.')[0]  # 只保留整数部分的时间戳
-            master_offset = int(match.group("master_offset"))
-            freq = int(match.group("freq"))
-            path_delay = int(match.group("path_delay"))
-            
-            # 从 time_diff 字典中查找对应的 diff
-            if timestamp_match in time_diff_dict:
-                diff = time_diff_dict[timestamp_match]
-                matching_data.append([timestamp, diff, master_offset, freq, path_delay])
-    
-    output_df = pd.DataFrame(matching_data, columns=["time", "target", "master_offset", "freq", "path_delay"])
-    
-    # 不存一下会有精度问题
-    output_df.to_csv(os.path.join(data_dir, 'tmp.csv'), index=False)
-    data = os.path.join(data_dir, 'tmp.csv')
-    df = pd.read_csv(data)
-    
-    df['date'] = pd.to_datetime(df['time'], unit='s')
-    df['OT'] = df['target']
-    df = df.drop(columns=['time', 'target'])
-    
-    # 打印处理后的数据
-    print(df)
-    
-    # 计算均值和方差
-    mean_freq = df['freq'].mean()
-    variance_freq = df['freq'].std()
-    
-    mean_path_delay = df['path_delay'].mean()
-    variance_path_delay = df['path_delay'].std()
-    
-    mean_master_offset = df['master_offset'].mean()
-    variance_master_offset = df['master_offset'].std()
-    
-    print(f"Mean of freq: {mean_freq}, Variance of freq: {variance_freq}")
-    print(f"Mean of path_delay: {mean_path_delay}, Variance of path_delay: {variance_path_delay}")
-    print(f"Mean of master_offset: {mean_master_offset}, Variance of master_offset: {variance_master_offset}")
-    
-    df.to_csv(os.path.join(data_dir, 'timestamp.csv'), index=False)
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='give me data path')
-    parser.add_argument("--data_date_path", type=str, default='0112')
-    args = parser.parse_args()
-    convert(args.data_date_path)
+    data = []
+    current_mjds = None
+
+    for line in lines:
+        if line.startswith("X:\\"):  # 检测到新段落的开头
+            current_mjds = None  # 重置当前MJD
+        elif "LAB." in line:  # 检测到表头行
+            current_mjds = line.split()[2:]  # 提取MJD
+        elif current_mjds and line.strip():  # 处理数据行
+            parts = line.split()
+            lab = parts[0]
+            clock = ''.join(parts[1:3])
+            drifts = parts[3:]
+            for i in range(len(drifts)):
+                if i < len(current_mjds):  # 确保数据与MJD对应
+                    data.append([lab, clock, current_mjds[i], drifts[i]])
+
+    # 转换为DataFrame
+    df_drift = pd.DataFrame(data, columns=['Laboratory', 'Clock', 'MJD', 'Frequency Drift/ns'])
+    
+    # 将缺失值（如*********）替换为NaN
+    df_drift['Frequency Drift/ns'] = df_drift['Frequency Drift/ns'].replace('*********', np.nan)
+    
+    # 将MJD和Frequency Drift/ns列转换为数值类型
+    df_drift['MJD'] = pd.to_numeric(df_drift['MJD'], errors='coerce')  # 将无效值转换为NaN
+    df_drift['Frequency Drift/ns'] = pd.to_numeric(df_drift['Frequency Drift/ns'], errors='coerce')
+    
+    # 删除MJD为NaN的行
+    df_drift = df_drift.dropna(subset=['MJD'])
+    
+    # 将MJD转换为日期时间格式
+    df_drift['MJD'] = pd.to_datetime(df_drift['MJD'], origin='1858-11-17', unit='D')
+    
+    # 按每5天重新采样并向前填充
+    df_drift = df_drift.set_index('MJD').groupby(['Laboratory', 'Clock']).resample('5D').ffill().reset_index()
+    df_drift = df_drift[df_drift['MJD'] >= 60274]
+    
+    return df_drift
+
+# 读取circularT.txt文件并解析
+def parse_circular_file(file_path):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    data = []
+    current_mjds = None
+
+    for line in lines:
+        if line.startswith("Date"):  # 检测到新段落的开头
+            continue
+        elif "MJD" in line:  # 检测到MJD行
+            current_mjds = line.split()[1:-3]  # 提取MJD
+            current_mjds = [int(mjd) for mjd in current_mjds]  # 将MJD转换为整数
+        elif "Laboratory k" in line:  # 检测到表头行
+            continue  # 跳过表头
+        elif current_mjds and line.strip():  # 处理数据行
+            pattern = re.compile(r"([A-Z]+)\s+\([^)]+\)\s+([\d\.\-\s]+)")
+            match = pattern.match(line)
+            if match:
+                lab = match.group(1)  # 站点名称
+                # 处理数值数据，将 '-' 替换为 NaN
+                values = []
+                for value in match.group(2).split():
+                    if value == '-':
+                        values.append(float('nan'))  # 将 '-' 替换为 NaN
+                    else:
+                        values.append(float(value))  # 正常转换为浮点数
+                utc_diff = values[:-3]
+                uA = values[-3]
+
+            for i in range(len(utc_diff)):
+                if i < len(current_mjds):  # 确保数据与日期和MJD对应
+                    data.append([
+                        lab, current_mjds[i], utc_diff[i], uA
+                    ])
+
+    # 转换为DataFrame
+    df_circular = pd.DataFrame(data, columns=[
+        'Laboratory', 'MJD', '[UTC-UTC(k)]/ns', 'uA'
+    ])
+    
+    # 将缺失值（如-）替换为NaN
+    df_circular['[UTC-UTC(k)]/ns'] = df_circular['[UTC-UTC(k)]/ns'].replace('-', np.nan)
+    df_circular['uA'] = df_circular['uA'].replace('-', np.nan)
+    
+    # 将MJD、OT和u列转换为数值类型
+    df_circular['MJD'] = pd.to_numeric(df_circular['MJD'], errors='coerce')  # 将无效值转换为NaN
+    df_circular['[UTC-UTC(k)]/ns'] = pd.to_numeric(df_circular['[UTC-UTC(k)]/ns'], errors='coerce')
+    df_circular['uA'] = pd.to_numeric(df_circular['uA'], errors='coerce')
+    
+    # 删除MJD为NaN的行
+    df_circular = df_circular.dropna(subset=['MJD'])
+    
+    return df_circular
+
+# 对缺失值进行线性插值
+def interpolate_missing_values(df, column):
+    df[column] = df.groupby(['Laboratory', 'Clock'])[column].apply(
+        lambda x: x.interpolate(method='linear', limit_direction='both')
+    ).reset_index(level=[0, 1], drop=True)
+    return df
+
+# 主程序
+def main():
+    # 解析drift.txt和circularT.txt文件
+    df_drift = parse_drift_file('/mnt/e/timer/PatchTST/dataset/UTC/drift.txt')
+    df_circular = parse_circular_file('/mnt/e/timer/PatchTST/dataset/UTC/CircularT.txt')
+
+    # 合并两个数据集
+    df_merged = pd.merge(df_circular, df_drift, on=['Laboratory', 'MJD'], how='outer')
+
+    # 对缺失值进行线性插值
+    df_merged = interpolate_missing_values(df_merged, 'Frequency Drift/ns')
+    df_merged = interpolate_missing_values(df_merged, '[UTC-UTC(k)]/ns')
+    df_merged = interpolate_missing_values(df_merged, 'uA')
+
+    # 将MJD列转换为int类型
+    df_merged['MJD'] = df_merged['MJD'].astype(int)
+
+    # 删除OT为空的行
+    df_merged = df_merged.dropna(subset=['[UTC-UTC(k)]/ns'])
+
+    # 按实验室名称分配编号（从1开始）
+    df_merged['Lab_ID'] = df_merged.groupby('Laboratory').ngroup() + 1
+
+    # 根据 [UTC-UTC(k)] 的绝对值划分 Group A~E
+    bins = [0, 3, 10, 50, 100, float('inf')]
+    labels = ['A', 'B', 'C', 'D', 'E']
+    df_merged['Group'] = pd.cut(df_merged['[UTC-UTC(k)]/ns'].abs(), bins=bins, labels=labels, right=False)
+
+    df_merged = df_merged[(df_merged['MJD'] <= 60600)] # 参照论文采390天的数据
+
+    # 保存为CSV文件
+    df_merged.to_csv('merged_data.csv', index=False)
+    print("数据已成功处理并保存为 merged_data.csv")
+
+
+    # 统计每个Group中有多少个Laboratory
+    group_lab_count = df_merged.groupby('Group', observed=False)['Laboratory'].nunique()
+    print("每个Group中的Laboratory数量：")
+    print(group_lab_count)
+
+    # 输出每个Group中的所有Laboratory名称
+    group_lab_names = df_merged.groupby('Group', observed=False)['Laboratory'].unique()
+    print("\n每个Group中的Laboratory名称：")
+    for group, labs in group_lab_names.items():
+        print(f"Group {group}: {', '.join(labs)}\n")
+
+
+# 运行主程序
+if __name__ == "__main__":
+    main()
