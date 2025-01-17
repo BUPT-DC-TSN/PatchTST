@@ -9,7 +9,7 @@ seq_len=336
 model_name=PatchTST
 
 # root_path_name=./dataset/
-root_path_name=/mnt/e/timer/PatchTST/dataset/0113
+root_path_name=/home/test/Documents/PatchTST/dataset/0113
 data_path_name=timestamp.csv
 model_id_name=0113_wifi
 data_name=custom
@@ -36,11 +36,11 @@ python -u ../../run_longExp.py \
     --dropout 0.2\
     --fc_dropout 0.2\
     --head_dropout 0\
-    --patch_len 16\
-    --stride 8\
+    --patch_len 16 \
+    --stride 8 \
     --train_epochs 300\
     --patience 20\
     --lradj 'TST'\
     --pct_start 0.4 \
-    --use_hour_sin 0 \
-    --batch_size 512 --learning_rate 0.0002 >logs/wifi/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 
+    --use_hour_sin 1 \
+    --batch_size 1024 --learning_rate 0.0002 >logs/wifi/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len.log 

@@ -1,9 +1,9 @@
 seq_len=336
-root_path_name=/mnt/e/timer/dataset/transformer/0112
-data_path_name=timestamp.csv
+root_path_name=/mnt/e/timer/PatchTST/dataset/0113/
+data_path_name=infer_local.csv
 pred_len=1
-checkpoint_path=/mnt/e/timer/PatchTST/PatchTST_supervised/scripts/PatchTST/checkpoints/0113_wifi_336_1_PatchTST_custom_featureMS_seqlen336_labellen48_predlen1_d_model128_numheads16_elayers3_dlayers1_dff256_fc1_time_emb0
-
+checkpoint_path=/mnt/e/timer/a100/PatchTST/PatchTST_supervised/scripts/PatchTST/checkpoints/0113_wifi_336_1_PatchTST_custom_featureMS_seqlen336_labellen48_predlen1_patch16_stride8_d_model128_numheads16_elayers3_dlayers1_dff256_fc1_time_emb1
+# :\timer\
 random_seed=2021
 
 python -u ../../infer.py \

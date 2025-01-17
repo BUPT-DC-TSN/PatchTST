@@ -1,0 +1,25 @@
+Args in experiment:
+Namespace(activation='gelu', affine=0, batch_size=1024, c_out=7, checkpoint_path=None, checkpoints='./checkpoints/', d_ff=256, d_layers=1, d_model=128, data='custom', data_path='timestamp.csv', dec_in=7, decomposition=0, devices='0', do_predict=False, draw=0, dropout=0.2, e_layers=3, enc_in=7, factor=1, fc_dropout=0.2, features='MS', freq='s', gpu=0, head_dropout=0.0, individual=0, is_training=1, kernel_size=25, label_len=48, learning_rate=0.0002, loss='mse', lradj='TST', model='PatchTST', model_id='0113_wifi_1200_1', moving_avg=25, n_heads=16, num_workers=10, output_attention=False, padding_patch='end', patch_len=16, patience=20, pct_start=0.4, pred_len=1, random_seed=2021, revin=1, root_path='/home/test/Documents/PatchTST/dataset/0113', seq_len=1200, stride=8, subtract_last=0, target='OT', test_flop=False, train_epochs=300, use_amp=False, use_gpu=True, use_hour_sin=0, use_multi_gpu=False)
+Use GPU: cuda:0
+>>>>>>>start training : 0113_wifi_1200_1_PatchTST_custom_featureMS_seqlen1200_labellen48_predlen1_patch16_stride8_d_model128_numheads16_elayers3_dlayers1_dff256_fc1_time_emb0>>>>>>>>>>>>>>>>>>>>>>>>>>
+   Seconds_sin  Seconds_cos  master_offset    freq  path_delay        OT
+0    -0.613835    -0.789434        -364081 -141944      823504  0.100037
+1    -0.613892    -0.789390        -500497 -387584      850636  0.100001
+2    -0.613950    -0.789345          78095   40859      545553  0.099990
+3    -0.614007    -0.789300         120429  106621      735511  0.099998
+4    -0.614065    -0.789256          -9225   13096      735511  0.100028
+train 33139
+   Seconds_sin  Seconds_cos  master_offset    freq  path_delay        OT
+0    -0.020584     0.999788         104708  459818     1078893  0.100035
+1    -0.020511     0.999790        -888214 -501691     1196184  0.099998
+2    -0.020439     0.999791        -133029  -12970      517121  0.099993
+3    -0.020366     0.999793          31582  111732      607114  0.100003
+4    -0.020293     0.999794        -106891  -17267      645498  0.100001
+val 4906
+   Seconds_sin  Seconds_cos  master_offset    freq  path_delay        OT
+0     0.339225     0.940705        -341522 -250471      858639  0.099967
+1     0.339294     0.940681        -268268 -279673      858639  0.099982
+2     0.339362     0.940656          -8864 -100750      947492  0.100003
+3     0.339430     0.940631         457762  363217      656913  0.099993
+4     0.339499     0.940606         134432  177216      780291  0.100034
+test 9811
