@@ -647,3 +647,50 @@ class Dataset_Pred_old(Dataset):
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
+
+
+
+class Dataset_TE(Dataset):
+    # ongoing
+    def __init__(self, root_path, data_path, size=None):
+        self.scale = StandardScaler()
+        df_raw = pd.read_csv(data_path)
+        if size:
+            self.seq_len = size[0]
+            self.label_len = size[1]
+            self.pred_len = size[2]
+        else:
+            self.seq_len = 336
+            self.label_len = 96
+            self.pred_len = 96
+        border1 = len(df_raw) - self.seq_len
+        border2 = len(df_raw)
+        
+        self.df_data = df_raw[border1:border2]
+        self.df_data.reset_index(drop=True)
+        
+        tmp_stamp = df_raw[['date']][border1:border2]
+        self.df_data['date'] = pd.to_datetime(tmp_stamp.date)
+        self.df_data.date = list(tmp_stamp.date.values)
+        self.df_data['date'] = pd.to_datetime(self.df_data.date)
+        self._get_time_feature()
+
+        self.scale.fit(self.df_data.values)
+        self.data_x = self.scale.transform(self.df_data)
+
+        
+    def _get_time_feature(self):
+        self.df_data['hour'] = self.df_data['date'].dt.hour
+        self.df_data['minute'] = self.df_data['date'].dt.minute
+        self.df_data['seconds'] = self.df_data['date'].dt.second
+        self.df_data['fractional_seconds'] = (self.df_data['date'] - self.df_data['date'].dt.floor('s')).dt.total_seconds()
+        
+        seconds_in_day = self.df_data['hour'] * 3600 + self.df_data['minute'] * 60 + self.df_data['seconds'] + self.df_data['fractional_seconds']
+        day_seconds = 24 * 60 * 60
+        # 计算正弦和余弦特征
+        self.df_data['Seconds_sin'] = np.sin(2 * np.pi * seconds_in_day / day_seconds)
+        self.df_data['Seconds_cos'] = np.cos(2 * np.pi * seconds_in_day / day_seconds)
+        
+        self.df_data = self.df_data.drop(['date', 'hour', 'minute', 'seconds', 'fractional_seconds'], axis=1)
+
+
