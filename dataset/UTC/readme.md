@@ -28,3 +28,7 @@ Set-com: Allan方差的倒数加权A部分中的所有值
 
 
 
+convert.py: 根据drift.txt和CircularT.txt得到merged_data.csv
+
+convert_set_com.py: 根据merged_data.csv得到set_com.csv
+
