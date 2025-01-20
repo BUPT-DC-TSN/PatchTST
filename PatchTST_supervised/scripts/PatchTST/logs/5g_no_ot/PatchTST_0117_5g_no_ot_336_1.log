@@ -1,0 +1,25 @@
+Args in experiment:
+Namespace(random_seed=2021, is_training=1, model_id='0117_5g_no_ot_336_1', model='PatchTST', data='5g_no_ot', root_path='/mnt/e/timer/PatchTST/dataset/0117', data_path='timestamp.csv', features='MS', target='OT', freq='s', checkpoints='./checkpoints/', use_hour_sin=0, draw=0, seq_len=336, label_len=48, pred_len=1, fc_dropout=0.2, head_dropout=0.0, patch_len=16, stride=8, padding_patch='end', revin=1, affine=0, subtract_last=0, decomposition=0, kernel_size=25, individual=0, enc_in=7, dec_in=7, c_out=7, d_model=128, n_heads=16, e_layers=3, d_layers=1, d_ff=256, moving_avg=25, factor=1, dropout=0.2, activation='gelu', output_attention=False, do_predict=False, num_workers=10, train_epochs=300, batch_size=1024, patience=20, learning_rate=0.0004, loss='mse', lradj='TST', pct_start=0.4, use_amp=False, use_gpu=True, gpu=0, use_multi_gpu=False, devices='0', test_flop=False, checkpoint_path=None)
+Use GPU: cuda:0
+>>>>>>>start training : 0117_5g_no_ot_336_1_PatchTST_5g_no_ot_featureMS_seqlen336_labellen48_predlen1_patch16_stride8_d_model128_numheads16_elayers3_dlayers1_dff256_fc1_time_emb0>>>>>>>>>>>>>>>>>>>>>>>>>>
+   Seconds_sin  Seconds_cos  path_delay
+0     0.664656    -0.747149     3132189
+1     0.664602    -0.747198     3132189
+2     0.664548    -0.747246     3132189
+3     0.664493    -0.747294     3187444
+4     0.664439    -0.747343     3220601
+train 17216
+   Seconds_sin  Seconds_cos  path_delay
+0    -0.610467    -0.792042     3050231
+1    -0.610524    -0.791998     3025430
+2    -0.610582    -0.791953     3050231
+3    -0.610639    -0.791909     3050231
+4    -0.610697    -0.791864     2978051
+val 2508
+   Seconds_sin  Seconds_cos  path_delay
+0    -0.744921    -0.667153     3259391
+1    -0.744969    -0.667099     3104725
+2    -0.745018    -0.667044     3104725
+3    -0.745067    -0.666990     3270911
+4    -0.745115    -0.666936     3270911
+test 5015

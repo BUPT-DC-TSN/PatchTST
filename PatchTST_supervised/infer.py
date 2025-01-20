@@ -41,6 +41,7 @@ class Dataset_Infer(torch.utils.data.Dataset):
         cols.remove('Seconds_cos')
         cols.remove('OT')
         cols = ['Seconds_sin', 'Seconds_cos'] + cols + ['OT']
+        # cols = ['Seconds_sin', 'Seconds_cos'] + cols
         self.df_data = self.df_data[cols]
 
         self.scale.fit(self.df_data.values)
@@ -90,88 +91,220 @@ class Dataset_Infer(torch.utils.data.Dataset):
         
         return seq_x
 
-    def update_data(self, master_offset, freq, path_delay, date, OT):
+    def update_data(self, master_offset, freq, path_delay, date, ot):
         date_features = self._get_time_feature_single(date)
         new_data = {
             "master_offset": master_offset,
             "freq": freq,
             "path_delay": path_delay,
             **date_features,
-            "OT": OT,
+            "OT": ot,
         }
         self.df_data = self.df_data[1:]
         self.df_data = pd.concat([self.df_data, pd.DataFrame([new_data])], ignore_index=True)
         self.scale.fit(self.df_data.values)
-        self.data_x = self.scale.transform(self.df_data)
+        self.data_x = self.scale.transform(self.df_data.values)
 
     def __len__(self):
         return len(self.data_x) - self.seq_len - self.pred_len + 1
 
 
-
-def infer(args, checkpoint_path, root_path, data_path, seq_len, pred_len, device):
-    model = PatchTST.Model(args).float()
-    model.load_state_dict(torch.load(os.path.join(checkpoint_path, 'checkpoint.pth')))
-    model.to(device)
-    model.eval()
-    f_dim = -1 # 单特征输出只取最后一个特征
-    
-    pred_data = Dataset_Infer(
-        root_path=root_path,
-        data_path=data_path,
-        seq_len=seq_len,
-        pred_len=pred_len
-    )
-    
-    preds = []
-    
-    with torch.no_grad():
-        while True:
-            input_x = pred_data.data_x
+class Infer:
+    def __init__(self, args, checkpoint_path, root_path, data_path, seq_len, pred_len, input_type, device):
+        self.model = PatchTST.Model(args).float()
+        self.model.load_state_dict(torch.load(os.path.join(checkpoint_path, 'checkpoint.pth')))
+        self.model.to(device)
+        self.model.eval()
+        self.device = device
+        self.pred_len = pred_len
+        self.input_type = input_type
+        
+        self.pred_data = Dataset_Infer(
+            root_path=root_path,
+            data_path=data_path,
+            seq_len=seq_len,
+            pred_len=pred_len
+        )
+        
+        self.preds = []
+        self.original_data = []
+        
+    def infer(self, pred_path=None):
+        with torch.no_grad():
+            input_x = self.pred_data.data_x
             input_x = np.expand_dims(input_x, axis=0)
-            input_x = torch.from_numpy(input_x).float().to(device)
-            outputs = model(input_x)
-            pred = outputs.detach().cpu().numpy()
-            pred = pred.squeeze(0)
-            pred = pred_data.scale.inverse_transform(pred)
-            pred = pred[-pred_len:, f_dim:]
-            pred = pred.squeeze(0).squeeze(0)
-            preds.append(pred)
-            print(pred)
-            
-            # === ===== ====测试输入数据(实际要换成数据接收程序)
-            data = input("输入 'q' 退出：")
-            if data.lower() == 'q':
-                break
-            try:
-                master_offset, freq, path_delay, date, OT = data.split(',')
-                master_offset = float(master_offset)
-                freq = float(freq)
-                path_delay = float(path_delay)
-                OT = float(OT)
-            except ValueError:
-                print("输入格式错误 master_offset,freq,path_delay,date,OT")
-                continue
-            
-            # ==== ==== ====
+            input_x = torch.from_numpy(input_x).float().to(self.device)
+            outputs = self.model(input_x)
+            pred = self._modify_outputs(outputs)
+            self.preds.append(pred)
+            if self.input_type == 0:
+                # 手动输入(要真值)
+                while True:
+                    print(pred)
+                    # === ===== ====测试输入数据(实际要换成数据接收程序)
+                    data = input("输入 'q' 退出：")
+                    if data.lower() == 'q':
+                        break
+                    try:
+                        master_offset, freq, path_delay, date, ot = data.split(',')
+                        master_offset = float(master_offset)
+                        freq = float(freq)
+                        path_delay = float(path_delay)
+                        ot = float(ot)
+                    except ValueError:
+                        print("输入格式错误 master_offset,freq,path_delay,date,OT")
+                        continue
+                    
+                    # ==== ==== ====
 
-            pred_data.update_data(master_offset, freq, path_delay, date, OT)
+                    pred = self._data_infer(master_offset, freq, path_delay, date, ot)
+                    self.preds.append(pred)
+            elif self.input_type == 1:
+                # 文件读取(不给真值)
+                assert pred_path != None, "file path is None!!"
+                late_data = pd.read_csv(pred_path)
+                for i in range(len(late_data)):
+                    master_offset = late_data.iloc[i]['master_offset']
+                    freq = late_data.iloc[i]['freq']
+                    path_delay = late_data.iloc[i]['path_delay']
+                    date = late_data.iloc[i]['date']
+                    ot = late_data.iloc[i]['OT']
+                    pred = self._data_infer(master_offset, freq, path_delay, date, pred)
+                    self.preds.append(pred)
+                    self.original_data.append(ot)
+                
+            
+            elif self.input_type == 2:
+                # 文件读取(给真值)
+                assert pred_path != None, "file path is None!!"
+                late_data = pd.read_csv(pred_path)
+                for i in range(len(late_data)):
+                    master_offset = late_data.iloc[i]['master_offset']
+                    freq = late_data.iloc[i]['freq']
+                    path_delay = late_data.iloc[i]['path_delay']
+                    date = late_data.iloc[i]['date']
+                    ot = late_data.iloc[i]['OT']
+                    pred = self._data_infer(master_offset, freq, path_delay, date, ot)
+                    self.preds.append(pred)
+                    self.original_data.append(ot)
+                    
+            elif self.input_type == 3:
+                assert pred_path is not None, "file path is None!!"
+                late_data = pd.read_csv(pred_path)
+                total_steps = len(late_data)  # 总时间步数
+                pred_buffer = np.zeros((total_steps + self.pred_len, self.pred_len))  # 缓存每个位置的预测值
+                pred_counts = np.zeros((total_steps + self.pred_len, 1))  # 记录每个位置被预测的次数
+
+                for i in range(total_steps):
+                    # 获取当前输入数据
+                    master_offset = late_data.iloc[i]['master_offset']
+                    freq = late_data.iloc[i]['freq']
+                    path_delay = late_data.iloc[i]['path_delay']
+                    date = late_data.iloc[i]['date']
+                    ot = late_data.iloc[i]['OT']
+
+                    # 更新数据集
+                    self.pred_data.update_data(master_offset, freq, path_delay, date, ot)
+
+                    # 进行预测
+                    input_x = self.pred_data.data_x
+                    input_x = np.expand_dims(input_x, axis=0)
+                    input_x = torch.from_numpy(input_x).float().to(self.device)
+                    outputs = self.model(input_x)
+                    pred = self._modify_outputs(outputs)  # 获取预测值 (pred_len,)
+
+                    # 将预测值存入缓存
+                    for j in range(self.pred_len):
+                        pred_buffer[i + j, j] += pred[j]  # 累加预测值
+                        pred_counts[i + j] += 1  # 记录预测次数
+
+                    # 取第一个预测值更新数据集（滑动窗口）
+                    # self.pred_data.update_data(master_offset, freq, path_delay, date, pred[0])
+
+                # 计算每个位置的预测均值
+                pred_means = []
+                for i in range(total_steps):
+                    if pred_counts[i] > 0:
+                        pred_means.append(pred_buffer[i, :self.pred_len].sum() / pred_counts[i])
+                    else:
+                        pred_means.append(0)  # 如果没有预测值，填充0
+
+                # 保存预测结果
+                self.preds = pred_buffer[:total_steps, 0]  # 只取第一个预测值作为最终预测结果
+                # self.preds = pred_means
+                self.original_data = late_data['OT'].values  # 保存真实值
+
+                 
+                pass
+            # TODO: elif 实时部署
+            
+        self.preds = np.array(self.preds)
+        self.original_data = np.array(self.original_data)
+
     
-    return preds
+    def draw(self, save_path, pic_name="pred_and_original.png"):
+        if self.input_type != 3:
+            draw_preds = self.preds[:-1, :]
+        else:
+            draw_preds = self.preds
+        draw_preds = draw_preds*1e-9
+        original = self.original_data
+        original = original*1e-9
+        # 计算 MSE 和 MAE
+        mse = mean_squared_error(original, draw_preds)
+        mae = mean_absolute_error(original, draw_preds)
+        
+        # 绘制折线图
+        plt.figure(figsize=(12, 6))
+        plt.plot(original, label='Original Data', color='blue')
+        plt.plot(draw_preds, label='Predicted Data', color='red')
+        plt.text(0.5, 0.02, f'MSE: {mse:.9f}, MAE: {mae:.9f}', transform=plt.gca().transAxes, fontsize=12, horizontalalignment='center', verticalalignment='bottom', bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
+        plt.xlabel('Time Steps')
+        plt.ylabel('Value')
+        plt.title('Original vs Predicted Values Over Time')
+        plt.legend()
+        plt.savefig(os.path.join(save_path, pic_name), dpi=300)
+        
+    
+    def _data_infer(self, master_offset, freq, path_delay, date, ot):
+        self.pred_data.update_data(master_offset, freq, path_delay, date, ot)
+        input_x = self.pred_data.data_x
+        input_x = np.expand_dims(input_x, axis=0)
+        input_x = torch.from_numpy(input_x).float().to(self.device)
+        outputs = self.model(input_x)
+        pred = self._modify_outputs(outputs)
+        return pred
+
+    def _modify_outputs(self, outputs):
+        pred = outputs.detach().cpu().numpy()
+        pred = pred.squeeze(0)
+        pred = self.pred_data.scale.inverse_transform(pred)
+        pred = pred[-self.pred_len:, -1:]
+        pred = pred.squeeze(1)
+        
+        return pred        
+
 
 def main(args):
-    preds_list = infer(
-        args,
-        args.checkpoint_path,
-        args.root_path,
-        args.data_path,
-        args.seq_len,
-        args.pred_len,
-        args.device
+    #  args, checkpoint_path, root_path, data_path, seq_len, pred_len, input_type, device):
+    infer_model = Infer(
+        args=args,
+        checkpoint_path=args.checkpoint_path,
+        root_path=args.root_path,
+        data_path=args.data_path,
+        seq_len=args.seq_len,
+        pred_len=args.pred_len,
+        input_type=args.input_type,
+        device=args.device
     )
-    
-    
-    return preds_list
+    infer_model.infer(pred_path=args.pred_path)
+    if args.draw == 1:
+        infer_model.draw(save_path=args.save_path, pic_name=args.pic_name)
+
+    # TODO: 保存或者输出结果
+    print(infer_model.pred_data)
+        
+
     
 
 
@@ -222,6 +355,11 @@ if __name__ == '__main__':
 
 
     parser.add_argument("--checkpoint_path", type=str, default=None)
+    parser.add_argument("--save_path", type=str, default=None)
+    parser.add_argument("--pred_path", type=str, default=None)
+    parser.add_argument("--input_type", type=int, default=1)
+    parser.add_argument("--draw", type=int, default=1)
+    parser.add_argument("--pic_name", type=str, default="pred_and_original.png")
 
     args = parser.parse_args()
     main(args)

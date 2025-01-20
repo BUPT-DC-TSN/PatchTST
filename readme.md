@@ -145,3 +145,8 @@ python -u ../../run_longExp.py \
 
 - `draw`: 1绘图 0预测单步，绘制后的图像会保存在`checkpoint.pth`同目录下
 - `checkpoint_path` 模型权重目录(权重为目录下的`checkpoint.pth`)
+
+
+01.18 update: 想要模型预测不逐步趋于定值，得输入上一步真实的te
+
+01.19 update: 是模型没训好吗？时序是否必要？

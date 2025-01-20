@@ -36,6 +36,10 @@ if __name__ == '__main__':
     parser.add_argument('--label_len', type=int, default=48, help='start token length')
     parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
 
+
+    # DLinear
+    #parser.add_argument('--individual', action='store_true', default=False, help='DLinear: a linear layer for each variate(channel) individually')
+
     # PatchTST
     parser.add_argument('--fc_dropout', type=float, default=0.05, help='fully connected dropout')
     parser.add_argument('--head_dropout', type=float, default=0.0, help='head dropout')
@@ -80,7 +84,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')
     parser.add_argument('--gpu', type=int, default=0, help='gpu')
     parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple gpus', default=False)
-    parser.add_argument('--devices', type=str, default='0,1,2,3', help='device ids of multile gpus')
+    parser.add_argument('--devices', type=str, default='0', help='device ids of multile gpus')
     parser.add_argument('--test_flop', action='store_true', default=False, help='See utils/tools for usage')
 
     parser.add_argument("--checkpoint_path", type=str, default=None)
@@ -108,7 +112,7 @@ if __name__ == '__main__':
     Exp = Exp_Main
 
     if args.is_training == 1:
-        setting = '{}_{}_{}_feature{}_seqlen{}_labellen{}_predlen{}_d_model{}_numheads{}_elayers{}_dlayers{}_dff{}_fc{}_time_emb{}'.format(
+        setting = '{}_{}_{}_feature{}_seqlen{}_labellen{}_predlen{}_patch{}_stride{}_d_model{}_numheads{}_elayers{}_dlayers{}_dff{}_fc{}_time_emb{}'.format(
             args.model_id,
             args.model,
             args.data,
@@ -116,6 +120,8 @@ if __name__ == '__main__':
             args.seq_len,
             args.label_len,
             args.pred_len,
+            args.patch_len,
+            args.stride,
             args.d_model,
             args.n_heads,
             args.e_layers,
@@ -140,21 +146,24 @@ if __name__ == '__main__':
     
     elif args.is_training == 0:
         # for pred
-        setting = '{}_{}_{}_feature{}_seqlen{}_labellen{}_predlen{}_d_model{}_numheads{}_elayers{}_dlayers{}_dff{}_fc{}_time_emb{}'.format(args.model_id,
-                                                                                                    args.model,
-                                                                                                    args.data,
-                                                                                                    args.features,
-                                                                                                    args.seq_len,
-                                                                                                    args.label_len,
-                                                                                                    args.pred_len,
-                                                                                                    args.d_model,
-                                                                                                    args.n_heads,
-                                                                                                    args.e_layers,
-                                                                                                    args.d_layers,
-                                                                                                    args.d_ff,
-                                                                                                    args.factor,
-                                                                                                    args.use_hour_sin,
-                                                                                                    )
+        setting = '{}_{}_{}_feature{}_seqlen{}_labellen{}_predlen{}_patch{}_stride{}_d_model{}_numheads{}_elayers{}_dlayers{}_dff{}_fc{}_time_emb{}'.format(
+            args.model_id,
+            args.model,
+            args.data,
+            args.features,
+            args.seq_len,
+            args.label_len,
+            args.pred_len,
+            args.patch_len,
+            args.stride,
+            args.d_model,
+            args.n_heads,
+            args.e_layers,
+            args.d_layers,
+            args.d_ff,
+            args.factor,
+            args.use_hour_sin,
+            )
         exp = Exp(args)  # set experiments
         print('>>>>>>>preding: {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
         exp.predict(setting, args.checkpoint_path, load=True)
@@ -162,21 +171,24 @@ if __name__ == '__main__':
     
 
     elif args.is_training==2:
-        setting = '{}_{}_{}_feature{}_seqlen{}_labellen{}_predlen{}_d_model{}_numheads{}_elayers{}_dlayers{}_dff{}_fc{}_time_emb{}'.format(args.model_id,
-                                                                                                    args.model,
-                                                                                                    args.data,
-                                                                                                    args.features,
-                                                                                                    args.seq_len,
-                                                                                                    args.label_len,
-                                                                                                    args.pred_len,
-                                                                                                    args.d_model,
-                                                                                                    args.n_heads,
-                                                                                                    args.e_layers,
-                                                                                                    args.d_layers,
-                                                                                                    args.d_ff,
-                                                                                                    args.factor,
-                                                                                                    args.use_hour_sin,
-                                                                                                    )
+        setting = '{}_{}_{}_feature{}_seqlen{}_labellen{}_predlen{}_patch{}_stride{}_d_model{}_numheads{}_elayers{}_dlayers{}_dff{}_fc{}_time_emb{}'.format(
+            args.model_id,
+            args.model,
+            args.data,
+            args.features,
+            args.seq_len,
+            args.label_len,
+            args.pred_len,
+            args.patch_len,
+            args.stride,
+            args.d_model,
+            args.n_heads,
+            args.e_layers,
+            args.d_layers,
+            args.d_ff,
+            args.factor,
+            args.use_hour_sin,
+            )
 
         exp = Exp(args)  # set experiments
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))

@@ -2,28 +2,29 @@ import pandas as pd
 import argparse
 import re
 import os
+import pandas as pd
+import os
+
+import pytz
+
 
 def convert(data_dir):
     # 读取文件change_timestamps.csv
-    df = pd.read_csv(os.path.join(data_dir, "change_timestamps.csv"))
+    df = pd.read_csv(os.path.join(data_dir, "final.csv"))
     # 计算奇数行与偶数行的差值
-    df['TimeAll'] = pd.to_datetime(df['Timestamp'], format='%Y-%m-%d %H-%M-%S.%f')
-    data = []
-    for i in range(0, len(df)-1, 2):
-        time_diff = df.iloc[i+1]['TimeAll'] - df.iloc[i]['TimeAll']
-        timestamp = df.iloc[i]['TimeAll']
-        data.append([timestamp, time_diff])
-    # 将数据保存为 CSV 文件
-    time_diff_df = pd.DataFrame(data, columns=["timestamp", "diff"])
-    time_diff_df.to_csv(os.path.join(data_dir, "time_diff.csv"), index=False)
+    df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d %H-%M-%S.%f')
+    
+    # 定义上海时区
+    shanghai_tz = pytz.timezone('Asia/Shanghai')
     
     time_diff_dict = {}
-    for _, row in time_diff_df.iterrows():
-        timestamp = str(row['timestamp']).split('.')[0]  # 只取整数部分
+    for _, row in df.iterrows():
+        timestamp = str(int(shanghai_tz.localize(row['timestamp']).timestamp()))
         time_diff_dict[timestamp] = row['diff']
+        
     
     # 打开 log 文件并读取所有行
-    log_file_path = os.path.join(data_dir, 'logs.txt')
+    log_file_path = os.path.join(data_dir, '基站1.txt')
     with open(log_file_path, "r") as file:
         log_lines = file.readlines()
     
@@ -31,8 +32,8 @@ def convert(data_dir):
     matching_data = []
     
     # 正则表达式，用于提取日志中的信息
-    log_pattern = re.compile(r'(?P<timestamp>\d+\.\d+) ptp4l\[\d+\.\d+\]: master offset\s+(?P<master_offset>-?\d+)\s+s2 freq\s+(?P<freq>-?\+?\d+)\s+path delay\s+(?P<path_delay>\d+)')
-    
+    log_pattern = re.compile(r'(?P<timestamp>\d+\.\d+) ptp4l\[\d+\.\d+\]: master offset\s+(?P<master_offset>-?\d+)\s+s\d freq\s+(?P<freq>[+-]?\d+)\s+path delay\s+(?P<path_delay>\d+)\n')
+
     # 遍历日志文件中的每一行，提取数据
     for line in log_lines:
         match = log_pattern.search(line)
@@ -80,6 +81,6 @@ def convert(data_dir):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='give me data path')
-    parser.add_argument("--data_date_path", type=str, default='0112')
+    parser.add_argument("--data_date_path", type=str, default='/mnt/e/timer/PatchTST/dataset/0117')
     args = parser.parse_args()
     convert(args.data_date_path)

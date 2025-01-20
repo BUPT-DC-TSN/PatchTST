@@ -56,6 +56,14 @@ class PatchTST_backbone(nn.Module):
         elif head_type == 'flatten': 
             # 直接给出预测结果。
             self.head = Flatten_Head(self.individual, self.n_vars, self.head_nf, target_window, head_dropout=head_dropout)
+            
+        # convert path_delay to ot
+        self.fc = nn.Sequential(
+            nn.Linear(self.n_vars, 4*self.n_vars),
+            nn.GELU(),
+            nn.Dropout(head_dropout),
+            nn.Linear(4*self.n_vars, 1),
+        )
         
     
     def forward(self, z):                                                                   # z: [bs x nvars x seq_len]
@@ -74,13 +82,21 @@ class PatchTST_backbone(nn.Module):
         
         # model
         z = self.backbone(z)                                                                # z: [bs x nvars x d_model x patch_num]
-        z = self.head(z)                                                                    # z: [bs x nvars x target_window] 
+        z = self.head(z)                                                                    # z: [bs x nvars x target_window]
+        
         
         # denorm
         if self.revin: 
             z = z.permute(0,2,1)
             z = self.revin_layer(z, 'denorm')
             z = z.permute(0,2,1)
+        
+        # 得到了path_delay的预测值
+        # channel上聚合
+        z = z.permute(0, 2, 1)
+        z = self.fc(z)
+        # z = z.permute(0, 2, 1)
+        
         return z
     
     def create_pretrain_head(self, head_nf, vars, dropout):
@@ -120,8 +136,7 @@ class Flatten_Head(nn.Module):
             x = torch.stack(x_out, dim=1)                 # x: [bs x nvars x target_window]
         else:
             x = self.flatten(x)
-            x = self.linear(x)
-            x = self.dropout(x)
+            x = self.dropout(self.linear(x))             # x: [bs x nvars * target_window]
         return x
         
         

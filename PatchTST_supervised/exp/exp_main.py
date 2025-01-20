@@ -54,14 +54,9 @@ class Exp_Main(Exp_Basic):
         total_loss = []
         self.model.eval()
         with torch.no_grad():
-            # for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
-            # i = 0
-            for batch_x, batch_y, batch_x_mark, batch_y_mark in tqdm(vali_loader, desc=f"valing"):
+            for batch_x, batch_y in tqdm(vali_loader, desc=f"valing"):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float()
-
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
@@ -69,21 +64,9 @@ class Exp_Main(Exp_Basic):
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
-                        if 'Linear' in self.args.model or 'TST' in self.args.model:
-                            outputs = self.model(batch_x)
-                        else:
-                            if self.args.output_attention:
-                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                            else:
-                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-                else:
-                    if 'Linear' in self.args.model or 'TST' in self.args.model:
                         outputs = self.model(batch_x)
-                    else:
-                        if self.args.output_attention:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                        else:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                else:
+                    outputs = self.model(batch_x)
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
                 batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
@@ -133,14 +116,12 @@ class Exp_Main(Exp_Basic):
             epoch_time = time.time()
             # for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(train_loader):
             i = 0
-            for batch_x, batch_y, batch_x_mark, batch_y_mark in tqdm(train_loader, desc=f'Train Epoch{epoch}'):
+            for batch_x, batch_y in tqdm(train_loader, desc=f'Train Epoch{epoch}'):
                 iter_count += 1
                 model_optim.zero_grad()
                 batch_x = batch_x.float().to(self.device)
 
                 batch_y = batch_y.float().to(self.device)
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
@@ -149,28 +130,14 @@ class Exp_Main(Exp_Basic):
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
-                        if 'Linear' in self.args.model or 'TST' in self.args.model:
-                            outputs = self.model(batch_x)
-                        else:
-                            if self.args.output_attention:
-                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                            else:
-                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
-
+                        outputs = self.model(batch_x)
                         f_dim = -1 if self.args.features == 'MS' else 0
                         outputs = outputs[:, -self.args.pred_len:, f_dim:]
                         batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
                         loss = criterion(outputs, batch_y)
                         train_loss.append(loss.item())
                 else:
-                    if 'Linear' in self.args.model or 'TST' in self.args.model:
-                            outputs = self.model(batch_x)
-                    else:
-                        if self.args.output_attention:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                            
-                        else:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark, batch_y)
+                    outputs = self.model(batch_x)
                     # print(outputs.shape,batch_y.shape)
                     f_dim = -1 if self.args.features == 'MS' else 0
                     outputs = outputs[:, -self.args.pred_len:, f_dim:]
@@ -239,12 +206,9 @@ class Exp_Main(Exp_Basic):
 
         self.model.eval()
         with torch.no_grad():
-            for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
+            for i, (batch_x, batch_y) in enumerate(test_loader):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
-
-                batch_x_mark = batch_x_mark.float().to(self.device)
-                batch_y_mark = batch_y_mark.float().to(self.device)
 
                 # decoder input
                 dec_inp = torch.zeros_like(batch_y[:, -self.args.pred_len:, :]).float()
@@ -252,22 +216,9 @@ class Exp_Main(Exp_Basic):
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
-                        if 'Linear' in self.args.model or 'TST' in self.args.model:
-                            outputs = self.model(batch_x)
-                        else:
-                            if self.args.output_attention:
-                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-                            else:
-                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        outputs = self.model(batch_x)
                 else:
-                    if 'Linear' in self.args.model or 'TST' in self.args.model:
-                            outputs = self.model(batch_x)
-                    else:
-                        if self.args.output_attention:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
-
-                        else:
-                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+                        outputs = self.model(batch_x)
 
                 f_dim = -1 if self.args.features == 'MS' else 0
                 # print(outputs.shape,batch_y.shape)
@@ -380,9 +331,11 @@ class Exp_Main(Exp_Basic):
         
         if self.args.draw == 1:
             preds = preds[:-1]
+            preds = preds*1e-9
             # 获取原始数据
             original_data = pred_data.scaler.inverse_transform(pred_data.data_x[self.args.seq_len:self.args.seq_len + len(preds)])  # 反归一化原始数据
             original_data = original_data[:, -1]
+            original_data = original_data*1e-9
             
             # 计算 MSE 和 MAE
             mse = mean_squared_error(original_data, preds)
@@ -392,12 +345,12 @@ class Exp_Main(Exp_Basic):
             plt.figure(figsize=(12, 6))
             plt.plot(original_data, label='Original Data', color='blue')
             plt.plot(preds, label='Predicted Data', color='red')
-            plt.text(0.5, 0.02, f'MSE: {mse:.8f}, MAE: {mae:.8f}', transform=plt.gca().transAxes, fontsize=12, horizontalalignment='center', verticalalignment='bottom', bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
+            plt.text(0.5, 0.02, f'MSE: {mse:.9f}, MAE: {mae:.9f}', transform=plt.gca().transAxes, fontsize=12, horizontalalignment='center', verticalalignment='bottom', bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
             plt.xlabel('Time Steps')
             plt.ylabel('Value')
             plt.title('Original vs Predicted Values Over Time')
             plt.legend()
-            plt.savefig(os.path.join(checkpoint_path, 'pred_s_sin.png'), dpi=300)
+            plt.savefig(os.path.join(checkpoint_path, '300_pred_s_sin.png'), dpi=300)
             
         else:
             print(preds)
