@@ -26,7 +26,7 @@ def clean_data(file_path):
     return cleaned_df
 
 # 使用示例
-file_path = "/mnt/e/timer/attach/attack.csv"  # 替换为实际路径
+file_path = "/mnt/e/timer/attack/2.14Long.csv"  # 替换为实际路径
 cleaned_df = clean_data(file_path)
 
 cleaned_df.to_csv("cleaned_data.csv", index=False)
